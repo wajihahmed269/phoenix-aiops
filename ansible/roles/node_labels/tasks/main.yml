@@ -1,0 +1,32 @@
+---
+- name: Resolve Kubernetes control-plane host
+  ansible.builtin.set_fact:
+    node_labels_control_plane_host: "{{ groups['control_plane'][0] | default(groups['k3s_server'][0] | default(groups['masters'][0] | default(inventory_hostname))) }}"
+  run_once: true
+
+- name: Build node label map from inventory
+  ansible.builtin.set_fact:
+    node_labels_map: "{{ node_labels_map | default({}) | combine({item: hostvars[item].node_labels}) }}"
+  loop: "{{ groups['all'] }}"
+  when:
+    - hostvars[item].node_labels is defined
+    - hostvars[item].node_labels | length > 0
+  run_once: true
+  delegate_to: "{{ node_labels_control_plane_host }}"
+
+- name: Apply labels to Kubernetes nodes
+  ansible.builtin.command:
+    cmd: >-
+      /usr/local/bin/k3s kubectl label node
+      {{ hostvars[item.0].kubernetes_node_name | default(hostvars[item.0].ansible_hostname | default(item.0)) }}
+      {{ item.1.key }}={{ item.1.value }}
+      --overwrite
+  loop: "{{ (node_labels_map | default({})) | dict2items | subelements('value') }}"
+  loop_control:
+    label: "{{ item.0.key }}: {{ item.1.key }}={{ item.1.value }}"
+  changed_when: "'not labeled' not in node_label_result.stderr"
+  register: node_label_result
+  run_once: true
+  delegate_to: "{{ node_labels_control_plane_host }}"
+  become: true
+  when: node_labels_map is defined

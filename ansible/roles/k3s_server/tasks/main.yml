@@ -1,0 +1,53 @@
+---
+- name: Ensure K3s configuration directory exists
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Install K3s server
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -sfL https://get.k3s.io | sh -s - server \
+      --write-kubeconfig-mode 644 \
+      {{ k3s_server_extra_args | default('') }}
+  args:
+    executable: /bin/bash
+    creates: /usr/local/bin/k3s
+  become: true
+
+- name: Enable and start K3s server
+  ansible.builtin.service:
+    name: k3s
+    state: started
+    enabled: true
+  become: true
+
+- name: Wait for Kubernetes API to become available
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s kubectl get nodes
+  register: k3s_api_check
+  changed_when: false
+  retries: 30
+  delay: 10
+  until: k3s_api_check.rc == 0
+  become: true
+
+- name: Read K3s node token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_node_token_file
+  become: true
+
+- name: Publish K3s server connection facts
+  ansible.builtin.set_fact:
+    k3s_server_url: >-
+      https://{{ k3s_server_private_ip
+        | default(ansible_host_private
+        | default(ansible_default_ipv4.address
+        | default(ansible_host | default(inventory_hostname)))) }}:6443
+    k3s_node_token: "{{ k3s_node_token_file.content | b64decode | trim }}"
+    cacheable: true

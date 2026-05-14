@@ -1,0 +1,29 @@
+---
+# ─────────────────────────────────────────
+# Phoenix AIOps - Master Playbook
+# Run: ansible-playbook -i inventory.ini playbook.yml
+# ─────────────────────────────────────────
+
+- name: Common setup on ALL nodes
+  hosts: all_nodes
+  become: true
+  roles:
+    - common
+
+- name: Setup K3s control plane (Node 1)
+  hosts: control_plane
+  become: true
+  roles:
+    - k3s_server
+
+- name: Join K3s agents (Nodes 2-5)
+  hosts: observatory,app,ollama,ai_ops
+  become: true
+  roles:
+    - k3s_agent
+
+- name: Distribute SSH keys from Node 5 to all nodes
+  hosts: all_nodes
+  become: true
+  roles:
+    - ssh_keys

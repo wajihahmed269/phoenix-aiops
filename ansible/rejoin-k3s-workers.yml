@@ -1,0 +1,174 @@
+---
+# Reinstall and rejoin K3s worker agents when an existing agent config points at
+# the wrong server URL.
+# Run from ansible/: ansible-playbook -i inventory.ini rejoin-k3s-workers.yml
+
+- name: Read K3s control-plane join data
+  hosts: control_plane
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Read K3s node token
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: k3s_node_token_file
+
+    - name: Publish K3s server connection facts
+      ansible.builtin.set_fact:
+        k3s_server_url: >-
+          https://{{ k3s_server_private_ip
+            | default(ansible_host_private
+            | default(ansible_default_ipv4.address
+            | default(ansible_host | default(inventory_hostname)))) }}:6443
+        k3s_node_token: "{{ k3s_node_token_file.content | b64decode | trim }}"
+        cacheable: true
+
+- name: Reinstall and rejoin K3s worker agents
+  hosts: workers
+  become: true
+  gather_facts: true
+  serial: 1
+  vars:
+    k3s_agent_stop_timeout: 30
+    k3s_agent_start_timeout: 90
+    k3s_agent_ready_retries: 18
+    k3s_agent_ready_delay: 5
+
+  pre_tasks:
+    - name: Resolve K3s server host
+      ansible.builtin.set_fact:
+        k3s_server_host: "{{ groups['control_plane'][0] | default(groups['k3s_server'][0] | default(groups['masters'][0] | default(''))) }}"
+      when: k3s_server_host is not defined
+
+    - name: Validate K3s server host is configured
+      ansible.builtin.assert:
+        that:
+          - k3s_server_host | length > 0
+        fail_msg: "Set k3s_server_host or define a control_plane, k3s_server, or masters inventory group."
+
+    - name: Resolve K3s server URL
+      ansible.builtin.set_fact:
+        k3s_agent_server_url: >-
+          {{ hostvars[k3s_server_host].k3s_server_url
+             | default('https://' ~ (
+                 hostvars[k3s_server_host].k3s_server_private_ip
+                 | default(hostvars[k3s_server_host].ansible_host_private
+                 | default(hostvars[k3s_server_host].ansible_default_ipv4.address
+                 | default(hostvars[k3s_server_host].ansible_host
+                 | default(k3s_server_host)))))
+               ~ ':6443') }}
+
+    - name: Read K3s node token from control plane when not already available
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: k3s_node_token_file
+      delegate_to: "{{ k3s_server_host }}"
+      run_once: true
+      no_log: true
+      when:
+        - hostvars[k3s_server_host].k3s_node_token | default('') | length == 0
+        - k3s_node_token | default('') | length == 0
+
+    - name: Use K3s node token from control-plane hostvars
+      ansible.builtin.set_fact:
+        k3s_agent_token: "{{ hostvars[k3s_server_host].k3s_node_token }}"
+      when: hostvars[k3s_server_host].k3s_node_token | default('') | length > 0
+      no_log: true
+
+    - name: Use K3s node token from play vars
+      ansible.builtin.set_fact:
+        k3s_agent_token: "{{ k3s_node_token }}"
+      when:
+        - k3s_agent_token | default('') | length == 0
+        - k3s_node_token | default('') | length > 0
+      no_log: true
+
+    - name: Use K3s node token read from control plane
+      ansible.builtin.set_fact:
+        k3s_agent_token: "{{ k3s_node_token_file.content | b64decode | trim }}"
+      when:
+        - k3s_agent_token | default('') | length == 0
+        - k3s_node_token_file.content | default('') | length > 0
+      no_log: true
+
+    - name: Validate K3s node token is available
+      ansible.builtin.assert:
+        that:
+          - k3s_agent_token | length > 0
+        fail_msg: "K3s node token is unavailable. Run the k3s_server role first or set k3s_node_token."
+      no_log: true
+
+    - name: Show target K3s server URL
+      ansible.builtin.debug:
+        msg: "Rejoining {{ inventory_hostname }} to {{ k3s_agent_server_url }}"
+
+  tasks:
+    - name: Check whether k3s-agent unit exists
+      ansible.builtin.command:
+        cmd: systemctl list-unit-files k3s-agent.service --no-legend
+      register: k3s_agent_unit
+      changed_when: false
+      failed_when: false
+
+    - name: Stop k3s-agent if installed
+      ansible.builtin.command:
+        cmd: "timeout {{ k3s_agent_stop_timeout }}s systemctl stop k3s-agent"
+      register: k3s_agent_stop
+      changed_when: k3s_agent_stop.rc == 0
+      failed_when: k3s_agent_stop.rc not in [0, 5, 124]
+      when: k3s_agent_unit.rc == 0 and k3s_agent_unit.stdout | length > 0
+
+    - name: Check for K3s agent uninstall script
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s-agent-uninstall.sh
+      register: k3s_agent_uninstall_script
+
+    - name: Uninstall existing K3s agent
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s-agent-uninstall.sh
+      register: k3s_agent_uninstall
+      changed_when: k3s_agent_uninstall.rc == 0
+      when: k3s_agent_uninstall_script.stat.exists
+
+    - name: Remove stale K3s agent config and state
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/rancher/k3s/config.yaml
+        - /var/lib/rancher/k3s/agent
+        - /var/lib/rancher/k3s/server
+        - /var/lib/kubelet
+
+    - name: Install K3s agent with private control-plane URL
+      ansible.builtin.shell: |
+        set -o pipefail
+        curl -sfL https://get.k3s.io | K3S_URL="{{ k3s_agent_server_url }}" K3S_TOKEN="{{ k3s_agent_token }}" sh -s - agent {{ k3s_agent_extra_args | default('') }}
+      args:
+        executable: /bin/bash
+      no_log: true
+
+    - name: Start and enable k3s-agent
+      ansible.builtin.command:
+        cmd: "timeout {{ k3s_agent_start_timeout }}s systemctl enable --now k3s-agent"
+      register: k3s_agent_start
+      changed_when: k3s_agent_start.rc == 0
+
+    - name: Wait for k3s-agent to become active
+      ansible.builtin.command:
+        cmd: systemctl is-active k3s-agent
+      register: k3s_agent_active
+      changed_when: false
+      retries: "{{ k3s_agent_ready_retries }}"
+      delay: "{{ k3s_agent_ready_delay }}"
+      until: k3s_agent_active.stdout == "active"
+
+    - name: Show k3s-agent status
+      ansible.builtin.command:
+        cmd: systemctl status k3s-agent --no-pager --lines=20
+      register: k3s_agent_status
+      changed_when: false
+
+    - name: Print k3s-agent status
+      ansible.builtin.debug:
+        var: k3s_agent_status.stdout_lines

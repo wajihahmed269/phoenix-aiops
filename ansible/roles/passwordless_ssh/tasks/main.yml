@@ -1,0 +1,53 @@
+---
+- name: Resolve AI Ops host
+  ansible.builtin.set_fact:
+    passwordless_ssh_aiops_host: "{{ groups['aiops'][0] | default(groups['ai_ops'][0] | default(groups['control_plane'][0] | default(inventory_hostname))) }}"
+  run_once: true
+
+- name: Ensure SSH directory exists on AI Ops node
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/.ssh"
+    state: directory
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0700"
+  delegate_to: "{{ passwordless_ssh_aiops_host }}"
+  run_once: true
+
+- name: Generate SSH key on AI Ops node
+  community.crypto.openssh_keypair:
+    path: "{{ ansible_env.HOME }}/.ssh/{{ passwordless_ssh_key_name | default('id_ed25519_aiops') }}"
+    type: ed25519
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0600"
+    comment: "aiops@{{ passwordless_ssh_aiops_host }}"
+  delegate_to: "{{ passwordless_ssh_aiops_host }}"
+  register: passwordless_ssh_keypair
+  run_once: true
+
+- name: Read AI Ops public key
+  ansible.builtin.slurp:
+    src: "{{ ansible_env.HOME }}/.ssh/{{ passwordless_ssh_key_name | default('id_ed25519_aiops') }}.pub"
+  delegate_to: "{{ passwordless_ssh_aiops_host }}"
+  register: passwordless_ssh_public_key_file
+  run_once: true
+
+- name: Authorize AI Ops SSH key on all nodes
+  ansible.posix.authorized_key:
+    user: "{{ passwordless_ssh_target_user | default(ansible_user) }}"
+    key: "{{ passwordless_ssh_public_key_file.content | b64decode | trim }}"
+    state: present
+    manage_dir: true
+  become: true
+
+- name: Add all nodes to AI Ops known_hosts
+  ansible.builtin.known_hosts:
+    path: "{{ ansible_env.HOME }}/.ssh/known_hosts"
+    name: "{{ hostvars[item].ansible_host | default(item) }}"
+    key: "{{ lookup('pipe', 'ssh-keyscan -T 5 -H ' ~ (hostvars[item].ansible_host | default(item))) }}"
+    state: present
+  loop: "{{ groups['all'] }}"
+  delegate_to: "{{ passwordless_ssh_aiops_host }}"
+  run_once: true
+  changed_when: false

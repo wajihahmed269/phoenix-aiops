@@ -1,0 +1,34 @@
+# ─────────────────────────────────────────
+# NEVER commit these
+# ─────────────────────────────────────────
+
+# Terraform sensitive files
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/.terraform.lock.hcl
+
+# SSH keys
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+phoenix_rsa
+phoenix_rsa.pub
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+
+# Secrets
+secrets/
+*.secret
+config.local.yaml
+
+# OS
+.DS_Store
+Thumbs.db

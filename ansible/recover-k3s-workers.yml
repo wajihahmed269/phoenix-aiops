@@ -1,0 +1,100 @@
+---
+# Recover K3s worker agents after a failed join/restart.
+# Run from ansible/: ansible-playbook -i inventory.ini recover-k3s-workers.yml
+
+- name: Recover K3s agents on worker nodes
+  hosts: workers
+  become: true
+  gather_facts: false
+  serial: 1
+  vars:
+    k3s_agent_stop_timeout: 30
+    k3s_agent_start_timeout: 60
+    k3s_agent_ready_retries: 12
+    k3s_agent_ready_delay: 5
+
+  tasks:
+    - name: Check whether k3s-agent unit exists
+      ansible.builtin.command:
+        cmd: systemctl list-unit-files k3s-agent.service --no-legend
+      register: k3s_agent_unit
+      changed_when: false
+      failed_when: false
+
+    - name: Fail if k3s-agent is not installed
+      ansible.builtin.fail:
+        msg: "k3s-agent.service is not installed on {{ inventory_hostname }}."
+      when: k3s_agent_unit.rc != 0 or k3s_agent_unit.stdout | length == 0
+
+    - name: Stop k3s-agent with a bounded timeout
+      ansible.builtin.command:
+        cmd: "timeout {{ k3s_agent_stop_timeout }}s systemctl stop k3s-agent"
+      register: k3s_agent_stop
+      changed_when: k3s_agent_stop.rc == 0
+      failed_when: k3s_agent_stop.rc not in [0, 124]
+
+    - name: Read k3s-agent state after stop attempt
+      ansible.builtin.command:
+        cmd: systemctl show k3s-agent --property=ActiveState --property=SubState --value
+      register: k3s_agent_stopped_state
+      changed_when: false
+      failed_when: false
+
+    - name: Terminate remaining k3s-agent unit processes
+      ansible.builtin.command:
+        cmd: systemctl kill --kill-who=all --signal=TERM k3s-agent
+      register: k3s_agent_term
+      changed_when: k3s_agent_term.rc == 0
+      failed_when: false
+      when: "'inactive' not in k3s_agent_stopped_state.stdout_lines"
+
+    - name: Wait briefly after TERM
+      ansible.builtin.pause:
+        seconds: 5
+      when: k3s_agent_term is not skipped
+
+    - name: Read k3s-agent state after TERM
+      ansible.builtin.command:
+        cmd: systemctl show k3s-agent --property=ActiveState --property=SubState --value
+      register: k3s_agent_term_state
+      changed_when: false
+      failed_when: false
+
+    - name: Kill stuck k3s-agent unit processes
+      ansible.builtin.command:
+        cmd: systemctl kill --kill-who=all --signal=KILL k3s-agent
+      register: k3s_agent_kill
+      changed_when: k3s_agent_kill.rc == 0
+      failed_when: false
+      when: "'inactive' not in k3s_agent_term_state.stdout_lines"
+
+    - name: Reset failed k3s-agent state
+      ansible.builtin.command:
+        cmd: systemctl reset-failed k3s-agent
+      changed_when: false
+
+    - name: Start k3s-agent cleanly
+      ansible.builtin.command:
+        cmd: "timeout {{ k3s_agent_start_timeout }}s systemctl start k3s-agent"
+      register: k3s_agent_start
+      changed_when: k3s_agent_start.rc == 0
+      failed_when: k3s_agent_start.rc != 0
+
+    - name: Wait for k3s-agent to become active
+      ansible.builtin.command:
+        cmd: systemctl is-active k3s-agent
+      register: k3s_agent_active
+      changed_when: false
+      retries: "{{ k3s_agent_ready_retries }}"
+      delay: "{{ k3s_agent_ready_delay }}"
+      until: k3s_agent_active.stdout == "active"
+
+    - name: Show k3s-agent status
+      ansible.builtin.command:
+        cmd: systemctl status k3s-agent --no-pager --lines=20
+      register: k3s_agent_status
+      changed_when: false
+
+    - name: Print k3s-agent status
+      ansible.builtin.debug:
+        var: k3s_agent_status.stdout_lines

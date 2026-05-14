@@ -1,0 +1,4 @@
+---
+- name: Include passwordless SSH role tasks
+  ansible.builtin.include_role:
+    name: passwordless_ssh

@@ -1,0 +1,30 @@
+---
+- name: Install zram tools
+  ansible.builtin.apt:
+    name: zram-tools
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Configure 4 GB ZRAM swap
+  ansible.builtin.copy:
+    dest: /etc/default/zramswap
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      ALGO={{ zram_algorithm | default('zstd') }}
+      PERCENT=0
+      SIZE={{ zram_size_mb | default(4096) }}
+      PRIORITY={{ zram_priority | default(100) }}
+  become: true
+  notify: Restart zramswap
+
+- name: Enable and start zramswap
+  ansible.builtin.service:
+    name: zramswap
+    state: started
+    enabled: true
+  become: true
