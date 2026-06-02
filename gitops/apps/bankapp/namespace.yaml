@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bankapp
+  labels:
+    app.kubernetes.io/name: bankapp
+    app.kubernetes.io/part-of: phoenix-aiops

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bankapp-backend
+  namespace: bankapp
+  labels:
+    app.kubernetes.io/name: bankapp-backend
+    app.kubernetes.io/part-of: bankapp
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: bankapp-backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

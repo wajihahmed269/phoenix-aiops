@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bankapp-backend
+  namespace: bankapp
+  labels:
+    app.kubernetes.io/name: bankapp-backend
+    app.kubernetes.io/part-of: bankapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bankapp-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bankapp-backend
+        app.kubernetes.io/part-of: bankapp
+    spec:
+      containers:
+        - name: backend
+          image: REPLACE_WITH_BANKAPP_BACKEND_IMAGE
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: bankapp-config
+            - secretRef:
+                name: bankapp-secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20

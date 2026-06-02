@@ -1,0 +1,39 @@
+# Argo CD MVP bootstrap values.
+# Access is local-only by default through kubectl port-forward.
+
+global:
+  domain: ""
+
+configs:
+  params:
+    server.insecure: "false"
+
+server:
+  service:
+    type: ClusterIP
+    servicePortHttp: 80
+    servicePortHttps: 443
+    # Optional lab-only NodePort access:
+    # - replace type with NodePort
+    # - uncomment nodePortHttp and nodePortHttps
+    # - confirm node security groups allow the chosen ports before use
+    # nodePortHttp: 30080
+    # nodePortHttps: 30443
+
+  ingress:
+    enabled: false
+
+controller:
+  replicas: 1
+
+repoServer:
+  replicas: 1
+
+applicationSet:
+  replicas: 1
+
+dex:
+  enabled: true
+
+redis:
+  enabled: true

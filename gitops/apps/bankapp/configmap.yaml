@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bankapp-config
+  namespace: bankapp
+  labels:
+    app.kubernetes.io/name: bankapp
+    app.kubernetes.io/part-of: bankapp
+data:
+  APP_ENV: dev
+  BACKEND_SERVICE_NAME: bankapp-backend
+  BACKEND_SERVICE_PORT: "8080"
