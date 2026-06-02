@@ -35,6 +35,15 @@ Phoenix-Ops is a self-healing DevOps/AIOps lab platform using Terraform, Ansible
 - If required values are missing, ask the user instead of guessing.
 - After editing, show `git diff -- AGENTS.md` or a narrower relevant diff.
 
+## Sub-Agent Files
+
+Read these focused instruction files before working in their areas:
+
+- `agents/terraform-agent.md`: read before Terraform infrastructure work under `terraform/` or infrastructure stop/start support changes.
+- `agents/ansible-agent.md`: read before Ansible provisioning, K3s installation, SSH automation, ZRAM, or worker recovery changes under `ansible/`.
+- `agents/kubernetes-agent.md`: read before raw Kubernetes manifest work, cluster validation logic, namespaces, deployments, services, configmaps, probes, or secret templates.
+- `agents/gitops-agent.md`: read before GitOps, Argo CD, Helm values, application template, sync strategy, or GitOps workflow changes under `gitops/`, `docs/argocd-install.md`, or related scripts.
+
 ## Terraform Agent Rules
 
 - Only edit files under `terraform/` when the user explicitly asks for Terraform work.
