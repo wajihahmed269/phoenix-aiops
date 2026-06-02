@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bankapp
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: bankapp
+    app.kubernetes.io/part-of: phoenix-aiops
+spec:
+  project: default
+  source:
+    # TODO: Replace with the real Git repository URL before creating this Application.
+    repoURL: TODO_REPLACE_WITH_GITOPS_REPOSITORY_URL
+    targetRevision: main
+    path: gitops/apps/bankapp
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bankapp
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false

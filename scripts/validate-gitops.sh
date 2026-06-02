@@ -60,10 +60,17 @@ else
   echo "kubectl not found; skipping Kustomize render and client-side dry run."
 fi
 
+echo
+echo "Checking shell script syntax..."
+for script in "${repo_root}"/scripts/*.sh; do
+  bash -n "${script}"
+done
+echo "Shell script syntax check passed."
+
 if command -v shellcheck >/dev/null 2>&1; then
   echo
   echo "Running shellcheck..."
-  shellcheck "${repo_root}/scripts/install-helm.sh" "${repo_root}/scripts/validate-gitops.sh"
+  shellcheck "${repo_root}"/scripts/*.sh
   echo "shellcheck passed."
 else
   echo

@@ -34,6 +34,7 @@ gitops/
     README.md
   apps/
     bankapp/
+      application.yaml
       namespace.yaml
       configmap.yaml
       secret-template.yaml
@@ -49,6 +50,8 @@ gitops/
       README.md
       kustomization.yaml
 scripts/
+  argocd-status.sh
+  check-cluster-health.sh
   install-helm.sh
   validate-gitops.sh
 ```
@@ -68,7 +71,8 @@ scripts/
    ```
 6. Install Argo CD only when ready.
 7. Register the GitOps repository with Argo CD only after the repository URL and access method are known.
-8. Create Argo CD Application manifests after the Git repository URL, target revision, and desired sync policy are known.
+8. Review `gitops/apps/bankapp/application.yaml` as the future Argo CD Application template.
+9. Create the Argo CD Application only after the Git repository URL, target revision, and desired manual sync process are known.
 
 ## Validation Commands
 
