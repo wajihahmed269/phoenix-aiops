@@ -183,11 +183,16 @@ resource "aws_instance" "phoenix_nodes" {
   vpc_security_group_ids = [aws_security_group.phoenix_sg.id]
   key_name               = data.aws_key_pair.phoenix_key.key_name
 
-  # Spot instance - saves 60-80% cost
-  instance_market_options {
-    market_type = "spot"
-    spot_options {
-      instance_interruption_behavior = "terminate"
+  dynamic "instance_market_options" {
+    for_each = var.use_spot_instances ? [1] : []
+
+    content {
+      market_type = "spot"
+
+      spot_options {
+        instance_interruption_behavior = "stop"
+        spot_instance_type             = "persistent"
+      }
     }
   }
 

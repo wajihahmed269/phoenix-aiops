@@ -14,6 +14,19 @@ output "node_private_ips" {
   }
 }
 
+output "ec2_instance_ids" {
+  description = "EC2 instance IDs for stopping, starting, and checking lab nodes"
+  value = {
+    for i, node in aws_instance.phoenix_nodes :
+    local.node_roles[i] => node.id
+  }
+}
+
+output "ec2_instance_id_args" {
+  description = "Space-separated EC2 instance IDs for AWS CLI lab scripts"
+  value       = join(" ", [for node in aws_instance.phoenix_nodes : node.id])
+}
+
 output "control_plane_public_ip" {
   description = "Node 1 public IP - for kubectl access"
   value       = aws_instance.phoenix_nodes[0].public_ip

@@ -36,3 +36,9 @@ variable "root_volume_size" {
   type        = number
   default     = 30
 }
+
+variable "use_spot_instances" {
+  description = "Use persistent Spot Instances that support stop/start. Defaults to on-demand instances."
+  type        = bool
+  default     = false
+}

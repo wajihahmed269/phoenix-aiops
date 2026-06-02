@@ -14,3 +14,6 @@ my_ip_cidr = "YOUR_PUBLIC_IP/32"
 # Ubuntu 22.04 LTS AMI for eu-north-1
 # Verify at: https://cloud-images.ubuntu.com/locator/ec2/
 ubuntu_ami = "ami-07c8c1b18ca66bb07"
+
+# Defaults to on-demand instances so lab nodes can be stopped and started.
+use_spot_instances = false
