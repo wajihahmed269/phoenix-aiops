@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pfms-ui
+  namespace: pfms-demo
+  labels:
+    app.kubernetes.io/part-of: phoenix-aiops
+    app.kubernetes.io/name: pfms-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pfms-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: phoenix-aiops
+        app.kubernetes.io/name: pfms-ui
+    spec:
+      containers:
+        - name: pfms-ui
+          image: ghcr.io/wajihahmed269/pfms-ui:pfms-mvp-v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: REACT_APP_API_GATEWAY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: pfms-mvp-config
+                  key: REACT_APP_API_GATEWAY_URL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  namespace: pfms-demo
+  labels:
+    app.kubernetes.io/part-of: phoenix-aiops
+    app.kubernetes.io/name: mysql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

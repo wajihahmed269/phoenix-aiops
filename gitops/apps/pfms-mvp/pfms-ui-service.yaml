@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pfms-ui
+  namespace: pfms-demo
+  labels:
+    app.kubernetes.io/part-of: phoenix-aiops
+    app.kubernetes.io/name: pfms-ui
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: pfms-ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: pfms-demo
+  labels:
+    app.kubernetes.io/part-of: phoenix-aiops
+    app.kubernetes.io/name: mysql
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql

@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pfms-mvp
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: REPLACE_WITH_GIT_REPO_URL
+    targetRevision: HEAD
+    path: gitops/environments/dev/pfms-mvp
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pfms-demo
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false

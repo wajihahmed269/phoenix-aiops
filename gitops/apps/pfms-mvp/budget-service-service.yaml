@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: budget-service
+  namespace: pfms-demo
+  labels:
+    app.kubernetes.io/part-of: phoenix-aiops
+    app.kubernetes.io/name: budget-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: budget-service
+  ports:
+    - name: http
+      port: 8082
+      targetPort: http
