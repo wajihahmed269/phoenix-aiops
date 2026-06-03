@@ -1,0 +1,14 @@
+
+# Terraform local files
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfvars
+
+# Secrets / keys
+*.pem
+*.key
+.env
+.env.*
