@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: REPLACE_WITH_GIT_REPO_URL
+    repoURL: https://github.com/wajihahmed269/phoenix-aiops.git
     targetRevision: HEAD
     path: gitops/environments/dev/pfms-mvp
   destination:
