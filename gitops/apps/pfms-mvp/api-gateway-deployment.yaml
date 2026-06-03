@@ -17,6 +17,8 @@ spec:
         app.kubernetes.io/part-of: phoenix-aiops
         app.kubernetes.io/name: api-gateway
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: api-gateway
           image: ghcr.io/wajihahmed269/pfms-api-gateway:pfms-mvp-v1
