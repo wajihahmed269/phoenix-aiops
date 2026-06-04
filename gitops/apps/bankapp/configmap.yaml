@@ -7,6 +7,14 @@ metadata:
     app.kubernetes.io/name: bankapp
     app.kubernetes.io/part-of: bankapp
 data:
-  APP_ENV: dev
-  BACKEND_SERVICE_NAME: bankapp-backend
-  BACKEND_SERVICE_PORT: "8080"
+  FRONTEND_URL: http://banking-frontend
+  OLLAMA_BASE_URL: http://ollama:11434
+  OLLAMA_MODEL: llama3.2:1b
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_CAPACITY: "100"
+  RATE_LIMIT_WINDOW_SECONDS: "60"
+  IDEMPOTENCY_RETENTION_HOURS: "24"
+  MONEY_MAX_TRANSACTION_AMOUNT: "1000000"
+  SENDGRID_ENABLED: "false"
+  CLOUDINARY_ENABLED: "false"
+  SPRING_JPA_SHOW_SQL: "false"

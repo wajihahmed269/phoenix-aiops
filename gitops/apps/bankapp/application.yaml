@@ -9,10 +9,9 @@ metadata:
 spec:
   project: default
   source:
-    # TODO: Replace with the real Git repository URL before creating this Application.
-    repoURL: TODO_REPLACE_WITH_GITOPS_REPOSITORY_URL
-    targetRevision: main
-    path: gitops/apps/bankapp
+    repoURL: https://github.com/wajihahmed269/phoenix-aiops.git
+    targetRevision: HEAD
+    path: gitops/environments/dev/bankapp
   destination:
     server: https://kubernetes.default.svc
     namespace: bankapp
