@@ -30,13 +30,13 @@ spec:
               containerPort: 3101
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /metrics
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /ready
+              path: /metrics
               port: http
             initialDelaySeconds: 30
             periodSeconds: 20
