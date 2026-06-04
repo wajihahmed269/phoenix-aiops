@@ -23,7 +23,7 @@ The frontend serves the Vite build through nginx on port `80` and routes API cal
 
 ## Required Secrets
 
-`secret-template.yaml` is dummy-only. Create the real `bankapp-secret` through an approved secret workflow before any manual sync.
+`secret-template.yaml` is dummy-only and intentionally not included in `kustomization.yaml`. Create the real `bankapp-secret` through an approved secret workflow before any manual sync so Argo CD does not overwrite runtime values with dummy data.
 
 Required keys:
 
