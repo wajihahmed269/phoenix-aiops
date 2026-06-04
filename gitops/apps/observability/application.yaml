@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: observability
+    app.kubernetes.io/part-of: phoenix-aiops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/wajihahmed269/phoenix-aiops.git
+    targetRevision: HEAD
+    path: gitops/environments/dev/observability
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false
