@@ -8,6 +8,8 @@ banking-frontend -> banking-backend -> RDS/MySQL
 
 These files are placeholders for review and later manual GitOps deployment. Do not apply them directly, sync Argo CD, or expose services publicly until the image tags, pull secret, database secret, and runtime smoke path are confirmed.
 
+For the first Phoenix-Ops presentation/demo, this slice also includes a temporary in-cluster MySQL Deployment named `bankapp-mysql`. This is a demo-stability workaround for the current private RDS reachability blocker only; the long-term target remains RDS/MySQL reachable from the Phoenix VPC through approved infrastructure changes.
+
 ## Images
 
 Use immutable image tags only:
@@ -32,7 +34,10 @@ SPRING_DATASOURCE_URL
 SPRING_DATASOURCE_USERNAME
 SPRING_DATASOURCE_PASSWORD
 JWT_SECRET
+MYSQL_ROOT_PASSWORD
 ```
+
+When using the temporary in-cluster MySQL demo path, set `SPRING_DATASOURCE_URL` to `jdbc:mysql://bankapp-mysql:3306/bankappdb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC`, set `SPRING_DATASOURCE_USERNAME` to `bankapp`, keep `SPRING_DATASOURCE_PASSWORD` as the application database password, and generate `MYSQL_ROOT_PASSWORD` outside Git.
 
 The image pull secret `ghcr-pull-secret` must also exist in the `bankapp` namespace before deployment.
 

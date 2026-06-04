@@ -3,6 +3,9 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - configmap.yaml
+  - mysql-pvc.yaml
+  - mysql-service.yaml
+  - mysql-deployment.yaml
   - backend-deployment.yaml
   - backend-service.yaml
   - backend-compat-service.yaml
