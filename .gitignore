@@ -12,3 +12,6 @@ terraform.tfvars
 *.key
 .env
 .env.*
+
+# Terraform provider lock files
+**/.terraform.lock.hcl

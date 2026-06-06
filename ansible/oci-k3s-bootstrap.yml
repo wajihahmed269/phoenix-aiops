@@ -1,0 +1,29 @@
+---
+# OCI K3s bootstrap playbook.
+# Preparation only in the current phase. Run only after explicit approval:
+# ansible-playbook -i ansible/inventory/oci/hosts.ini ansible/oci-k3s-bootstrap.yml
+
+- name: Common setup on OCI nodes
+  hosts: all_nodes
+  become: true
+  roles:
+    - common
+
+- name: Allow private OCI VCN traffic through host firewall
+  hosts: all_nodes
+  become: true
+  roles:
+    - oci_private_firewall
+
+- name: Install K3s server on OCI control plane
+  hosts: control_plane
+  become: true
+  roles:
+    - k3s_server
+
+- name: Join OCI K3s worker agents
+  hosts: workers
+  become: true
+  roles:
+    - k3s_agent
+

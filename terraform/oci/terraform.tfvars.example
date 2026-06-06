@@ -1,0 +1,26 @@
+# Phoenix-Ops OCI example values.
+# Copy to terraform.tfvars locally if needed, but never commit real tfvars files.
+
+region = "me-jeddah-1"
+
+compartment_ocid = "ocid1.compartment.oc1..aaaaaaaauzww5eknxu6fecvdm632udxfj5uug26yih3mb6uzsxfdchefoh7q"
+
+# Your public IP in CIDR format.
+# Find it with: curl ifconfig.me
+# Example: 203.0.113.5/32
+ssh_ingress_cidr = "YOUR_PUBLIC_IP/32"
+
+# Paste your public key content, not a private key.
+# Example: ssh-rsa AAAA... user@workstation
+ssh_public_key = "PASTE_PUBLIC_SSH_KEY_CONTENT"
+
+# Leave null to use the latest matching Canonical Ubuntu 22.04 image lookup.
+# If lookup fails in me-jeddah-1, set a reviewed OCI Ubuntu image OCID here.
+instance_image_ocid = null
+
+# Review shape availability and cost before provisioning.
+instance_shape      = "VM.Standard.E4.Flex"
+instance_ocpus      = 1
+instance_memory_gbs = 6
+boot_volume_size_gbs = 50
+
