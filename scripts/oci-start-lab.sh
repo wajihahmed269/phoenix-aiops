@@ -8,8 +8,8 @@ mapfile -t instance_ids < <(
   oci compute instance list \
     --compartment-id "${COMPARTMENT_OCID}" \
     --all \
-    --query "join('\n', data[?\"freeform-tags\".Project=='${PROJECT_TAG}' && \"lifecycle-state\"=='STOPPED'].id)" \
-    --raw-output
+    --query "data[?\"freeform-tags\".Project=='${PROJECT_TAG}' && \"lifecycle-state\"=='STOPPED'].id" \
+    --output json | jq -r '.[]'
 )
 
 if [ "${#instance_ids[@]}" -eq 0 ]; then
@@ -21,6 +21,7 @@ echo "Starting Phoenix-Ops OCI instances:"
 printf '  %s\n' "${instance_ids[@]}"
 
 for instance_id in "${instance_ids[@]}"; do
-  oci compute instance action --instance-id "${instance_id}" --action START
+  oci compute instance action \
+    --instance-id "${instance_id}" \
+    --action START
 done
-
