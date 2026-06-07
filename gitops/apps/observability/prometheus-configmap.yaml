@@ -49,36 +49,6 @@ data:
           - source_labels: [__meta_kubernetes_endpoint_node_name]
             target_label: node
 
-      - job_name: kubernetes-kubelet
-        scheme: https
-        tls_config:
-          insecure_skip_verify: true
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        kubernetes_sd_configs:
-          - role: node
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_node_address_InternalIP]
-            target_label: __address__
-            replacement: $1:10250
-          - source_labels: [__meta_kubernetes_node_name]
-            target_label: node
-        metrics_path: /metrics
-
-      - job_name: kubernetes-cadvisor
-        scheme: https
-        tls_config:
-          insecure_skip_verify: true
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        kubernetes_sd_configs:
-          - role: node
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_node_address_InternalIP]
-            target_label: __address__
-            replacement: $1:10250
-          - source_labels: [__meta_kubernetes_node_name]
-            target_label: node
-        metrics_path: /metrics/cadvisor
-
       - job_name: kubernetes-pods-annotated
         kubernetes_sd_configs:
           - role: pod

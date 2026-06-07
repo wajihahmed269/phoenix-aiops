@@ -5,6 +5,7 @@
 - Deployed through `argocd/observability` on OCI K3s using `~/.kube/phoenix-k3s-oci.yaml`
 - No public ingress or LoadBalancer exposure added for observability
 - Grafana admin secret created manually in `observability`
+- Stabilization completed through GitOps revisions `021880b` and `e82d083`
 
 ## What Was Deployed
 
@@ -15,11 +16,14 @@
 - PVCs: `prometheus-data` 5Gi, `loki-data` 5Gi
 - Argo CD Application: `argocd/observability`
 
-## What Works
+## Final Working State
 
-- `argocd/observability` exists and sync completed successfully
+- `argocd/observability` is `Synced` and `Healthy` at revision `e82d083`
+- All observability pods are `Running`
 - Prometheus pod is `Running`; `/-/healthy` and `/-/ready` return OK
 - Loki pod is `Running`; `/ready` returns OK
+- Loki labels are present: `app`, `container`, `filename`, `namespace`, `pod`, `stream`
+- Loki query `{namespace="bankapp"}` returns BankApp logs
 - Grafana pod is `Running`; `/login` returns 200 and `/api/health` reports `database: ok`
 - Grafana datasources are provisioned: `Prometheus`, `Loki`
 - Grafana dashboards are loaded: `BankApp Operations`, `Phoenix Cluster Health`
@@ -27,39 +31,72 @@
 - Promtail is running on all five nodes
 - Prometheus PVC and Loki PVC are both `Bound`
 
-## What Failed
+## What Failed And Was Fixed
 
-- Loki ingestion is not working yet
-- `Loki /loki/api/v1/labels` returns no labels
-- Query `{namespace="bankapp"}` returns zero results
-- Promtail is discovering `0/0` targets and sending `0` bytes / `0` entries
-- `positions.yaml` remains empty: `positions: {}`
-- Prometheus kubelet and cAdvisor targets return `403 Forbidden`
-- `kube-state-metrics` is in `CrashLoopBackOff`; its probes hit `/readyz` and `/livez` and receive `404`
+### Promtail and Loki ingestion
 
-## Root Cause Found
+Problem:
+- Promtail discovered `0/0` targets, tailed no files, and pushed no log lines
+- Loki labels were empty and BankApp queries returned zero results
 
-- Promtail is using the pod hostname for Kubernetes pod service discovery
-- In this DaemonSet, the default hostname is the pod name, not the node name
-- That causes Kubernetes discovery to field-select on `spec.nodeName=<promtail-pod-name>`, which matches nothing
-- Result: Promtail discovers zero pod targets, tails zero files, and pushes zero log lines to Loki
+Root cause:
+- Promtail relied on `HOSTNAME` for node-local Kubernetes pod discovery
+- In the DaemonSet, the default hostname was the pod name instead of the node name
 
-## Local Fix Prepared But Not Applied To Cluster
+Fix:
+- Commit `021880b Fix promtail node-local pod discovery`
+- Added `HOSTNAME` from `spec.nodeName` in `gitops/apps/observability/promtail-daemonset.yaml`
+- Synced through Argo CD and verified successful rollout
 
-- File: `gitops/apps/observability/promtail-daemonset.yaml`
-- Minimal change: set `HOSTNAME` from `spec.nodeName`
-- This is a local uncommitted Git change only; it has not been synced to Argo CD or live-patched into the cluster
+Result:
+- Promtail target discovery works
+- Loki ingestion works
+- BankApp frontend logs are visible in Loki
+- Earlier `10.43.0.1:443 connect: no route to host` messages appear to have been transient startup noise
 
-## Prometheus 403 Assessment
+### kube-state-metrics health probes
 
-- Current Prometheus RBAC is sufficient for Kubernetes API reads
-- The `403 Forbidden` errors are from direct kubelet access on `https://<node-ip>:10250/metrics` and `/metrics/cadvisor`
-- Safest near-term approach for this lab: disable kubelet and cAdvisor scrape jobs and rely on `node-exporter` plus `kube-state-metrics`
-- Safer than weakening kubelet authz or enabling broader node-level access
+Problem:
+- `kube-state-metrics` was in `CrashLoopBackOff`
+- Kubelet reported probe failures with `404` on `/readyz` and `/livez`
+
+Root cause:
+- The image `registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.14.0` starts cleanly, but those probe paths are not served on the telemetry port in this runtime
+
+Fix:
+- Commit `e82d083 Fix kube-state-metrics health probes`
+- Switched readiness and liveness probes to `/metrics` on the telemetry port in `gitops/apps/observability/kube-state-metrics-deployment.yaml`
+- Synced through Argo CD and verified rollout completed successfully
+
+Result:
+- `kube-state-metrics` is now `1/1 Running`
+- `argocd/observability` moved from `Progressing` to `Healthy`
+
+## Prometheus kubelet/cAdvisor Decision
+
+Current state:
+- Prometheus has `9` targets `up` and `10` targets `down`
+- All down targets are the `kubernetes-kubelet` and `kubernetes-cadvisor` jobs
+- Each failure is `403 Forbidden` from direct kubelet access on `https://<node-ip>:10250`
+
+Assessment:
+- Current Prometheus RBAC is sufficient for Kubernetes API discovery
+- The failures are from kubelet authorization, not missing Kubernetes API RBAC
+- We should not weaken kubelet security for this lab just to make those scrapes work
+
+Prepared local-only patch:
+- File: `gitops/apps/observability/prometheus-configmap.yaml`
+- Removes the `kubernetes-kubelet` and `kubernetes-cadvisor` scrape jobs
+- Dry-run passed
+- Not committed and not synced yet
+
+Recommended lab posture:
+- Disable those two scrape jobs
+- Rely on `node-exporter` plus `kube-state-metrics` for node and Kubernetes-state visibility
 
 ## Resource Usage Before And After
 
-### Before rollout
+### Before rollout baseline
 
 - `controlplane`: 67m CPU, 2248Mi memory, 37%
 - `app`: 15m CPU, 1542Mi memory, 26%
@@ -67,33 +104,34 @@
 - `aiops`: 12m CPU, 1137Mi memory, 19%
 - `ollama`: 24m CPU, 1676Mi memory, 28%
 
-### After rollout snapshot
+### Current stabilized snapshot
 
-- `controlplane`: 64m CPU, 2380Mi memory, 40%
-- `app`: 21m CPU, 1599Mi memory, 27%
-- `observatory`: 28m CPU, 1455Mi memory, 24%
-- `aiops`: 33m CPU, 1269Mi memory, 21%
-- `ollama`: 38m CPU, 1713Mi memory, 28%
+- `controlplane`: 74m CPU, 2353Mi memory, 39%
+- `app`: 21m CPU, 1627Mi memory, 27%
+- `observatory`: 25m CPU, 1476Mi memory, 24%
+- `aiops`: 31m CPU, 1320Mi memory, 22%
+- `ollama`: 35m CPU, 1723Mi memory, 29%
 
-### Observability pod memory snapshot
+### Current observability pod memory snapshot
 
-- `grafana`: 67Mi
-- `prometheus`: 43Mi
-- `loki`: 35Mi
-- `promtail`: about 19Mi per pod
-- `node-exporter`: about 7Mi per pod
+- `grafana`: 69Mi
+- `prometheus`: 48Mi
+- `loki`: 64Mi
+- `promtail`: about 25Mi to 37Mi per pod
+- `node-exporter`: about 7Mi to 8Mi per pod
+- `kube-state-metrics`: healthy after rollout; current memory not captured during the last `top` window because it was restarting during earlier snapshots
 
 ## Remaining Risks
 
-- Loki has no useful value until Promtail discovery is fixed and log ingestion is proven
-- `kube-state-metrics` instability reduces dashboard completeness and cluster metrics reliability
-- Kubelet/cAdvisor direct scraping is not usable as currently configured
-- Argo CD is currently tracking remote GitHub `HEAD`, so local fixes cannot reach the cluster until committed and pushed, or manually live-patched with accepted drift
+- Prometheus still has noisy down targets from `kubernetes-kubelet` and `kubernetes-cadvisor`
+- The lab currently depends on `node-exporter` and `kube-state-metrics` rather than direct kubelet scraping
+- BankApp logs are visible, but only frontend logs were explicitly revalidated in this pass; backend and MySQL visibility should be spot-checked during the next smoke pass
+- Observability is stable enough for the next phase, but Prometheus scrape noise should be cleaned up before using alerts as AI-remediation triggers
 
-## Next Steps Toward AI Remediation
+## Next Prerequisites For AI Remediation Phase
 
-1. Commit and push the Promtail node-name fix, then run a one-shot Argo sync for `observability`
-2. Revalidate Loki labels and confirm `bankapp` log visibility
-3. Fix `kube-state-metrics` health probes with the smallest verified probe path change
-4. Disable kubelet/cAdvisor scrape jobs for this lab unless a safer kubelet-auth path is explicitly chosen
-5. Once logs and metrics are stable, use Loki plus Prometheus as the telemetry base for a human-approved AI remediation flow
+1. Decide whether to commit and sync the local Prometheus patch that disables kubelet and cAdvisor scrape jobs
+2. Re-run Prometheus target validation after that decision
+3. Spot-check backend and MySQL logs in Loki in addition to frontend logs
+4. Define the initial alert and incident signals that should feed future AI analysis
+5. Keep any future remediation flow human-approved only; no automatic cluster mutation without explicit approval
