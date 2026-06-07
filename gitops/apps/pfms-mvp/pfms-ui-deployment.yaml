@@ -21,7 +21,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: pfms-ui
-          image: ghcr.io/wajihahmed269/pfms-ui:pfms-mvp-v2
+          image: ghcr.io/wajihahmed269/pfms-ui:pfms-mvp-v3
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
