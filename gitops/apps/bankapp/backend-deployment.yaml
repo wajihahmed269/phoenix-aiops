@@ -13,6 +13,8 @@ spec:
       app.kubernetes.io/name: banking-backend
   template:
     metadata:
+      annotations:
+        bankapp.phoenix-ops/config-version: cors-local-8088-v1
       labels:
         app.kubernetes.io/name: banking-backend
         app.kubernetes.io/part-of: bankapp
