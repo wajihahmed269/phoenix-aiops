@@ -42,13 +42,42 @@ class ConfigLoaderTests(unittest.TestCase):
                         "restart_thresholds": {"repeated_restart_count": 3, "crashloop_restart_count": 2},
                         "cooldowns": {"default_minutes": 15, "known_limitation_minutes": 60},
                         "local_storage_path": "services/ai-remediation/data/runtime/test.jsonl",
+                        "approval_storage_path": "services/ai-remediation/data/runtime/approvals.jsonl",
+                        "execution_audit_path": "services/ai-remediation/data/runtime/execution-audit.jsonl",
+                        "incident_artifacts_path": "incident-artifacts",
                         "feature_flags": {
                             "enable_prometheus_collector": False,
                             "enable_loki_collector": False,
                             "enable_kubernetes_collector": True,
                             "enable_argo_collector": True,
+                            "enable_k8sgpt_collector": False,
+                            "enable_remediation_planner": True,
+                            "enable_approval_workflow": True,
+                            "enable_snapshot_capture": True,
+                            "enable_verification": True,
                             "enable_ollama_summary": False,
                             "enable_execution": False
+                        },
+                        "remediation": {
+                            "simulation_only": True,
+                            "execution_timeout_seconds": 30,
+                            "approval_ttl_minutes": 30,
+                            "namespace_allowlist": ["bankapp"],
+                            "resource_kind_allowlist": ["Deployment", "Node"],
+                            "protected_namespaces": ["argocd"],
+                            "max_blast_radius": "medium",
+                            "rollback_retention_days": 7,
+                            "maintenance_windows_enabled": False,
+                            "escalation_minutes": {"t1": 1, "t5": 5, "t10": 10, "t15": 15},
+                            "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status", "cordon", "uncordon"]
+                        },
+                        "k8sgpt": {
+                            "binary": "k8sgpt",
+                            "timeout_seconds": 20,
+                            "max_output_kb": 256,
+                            "namespace_allowlist": ["bankapp"],
+                            "filters": ["Pod"],
+                            "explicit_kubeconfig": "/tmp/kubeconfig"
                         }
                     }
                 ),

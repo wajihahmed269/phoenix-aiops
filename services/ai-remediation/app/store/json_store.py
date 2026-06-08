@@ -7,7 +7,7 @@ from threading import Lock
 from app.models.recommendation import Recommendation
 
 
-VALID_STATUSES = {"proposed", "acknowledged", "suppressed", "rejected", "expired"}
+VALID_STATUSES = {"proposed", "acknowledged", "suppressed", "approved", "rejected", "executed", "verified", "rolled_back", "expired"}
 
 
 class JsonRecommendationStore:

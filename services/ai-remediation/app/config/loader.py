@@ -23,7 +23,21 @@ REQUIRED_TOP_LEVEL_KEYS = {
     "restart_thresholds",
     "cooldowns",
     "local_storage_path",
+    "approval_storage_path",
+    "execution_audit_path",
+    "incident_artifacts_path",
     "feature_flags",
+    "remediation",
+    "k8sgpt",
+}
+
+REQUIRED_K8SGPT_KEYS = {
+    "binary",
+    "timeout_seconds",
+    "max_output_kb",
+    "namespace_allowlist",
+    "filters",
+    "explicit_kubeconfig",
 }
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "default.json"
@@ -34,8 +48,19 @@ def load_config(config_path: str | None = None) -> dict[str, Any]:
     resolved = Path(config_path or os.environ.get(CONFIG_PATH_ENV) or DEFAULT_CONFIG_PATH)
     with resolved.open("r", encoding="utf-8") as handle:
         config = json.load(handle)
+    _normalize_config(config)
     _validate_config(config)
     return config
+
+
+def _normalize_config(config: dict[str, Any]) -> None:
+    for key in ("kubeconfig_path", "local_storage_path", "approval_storage_path", "execution_audit_path", "incident_artifacts_path"):
+        if key in config and isinstance(config[key], str):
+            config[key] = str(Path(config[key]).expanduser())
+    if "k8sgpt" in config and isinstance(config["k8sgpt"], dict):
+        kubeconfig = config["k8sgpt"].get("explicit_kubeconfig")
+        if isinstance(kubeconfig, str):
+            config["k8sgpt"]["explicit_kubeconfig"] = str(Path(kubeconfig).expanduser())
 
 
 def _validate_config(config: dict[str, Any]) -> None:
@@ -51,3 +76,57 @@ def _validate_config(config: dict[str, Any]) -> None:
 
     if config["feature_flags"].get("enable_execution"):
         raise ValueError("enable_execution must remain false in this phase")
+
+    remediation = config["remediation"]
+    required_remediation_keys = {
+        "simulation_only",
+        "execution_timeout_seconds",
+        "approval_ttl_minutes",
+        "namespace_allowlist",
+        "resource_kind_allowlist",
+        "protected_namespaces",
+        "max_blast_radius",
+        "rollback_retention_days",
+        "maintenance_windows_enabled",
+        "escalation_minutes",
+        "command_allowlist",
+    }
+    missing_remediation = sorted(required_remediation_keys - set(remediation))
+    if missing_remediation:
+        raise ValueError(f"missing remediation config keys: {', '.join(missing_remediation)}")
+    if not isinstance(remediation["namespace_allowlist"], list) or not remediation["namespace_allowlist"]:
+        raise ValueError("remediation.namespace_allowlist must be a non-empty list")
+    if not isinstance(remediation["resource_kind_allowlist"], list) or not remediation["resource_kind_allowlist"]:
+        raise ValueError("remediation.resource_kind_allowlist must be a non-empty list")
+    if not set(remediation["namespace_allowlist"]).issubset(set(config["namespace_allowlist"])):
+        raise ValueError("remediation.namespace_allowlist must stay within namespace_allowlist")
+    if remediation["max_blast_radius"] not in {"low", "medium", "high"}:
+        raise ValueError("remediation.max_blast_radius must be low, medium, or high")
+    if int(remediation["execution_timeout_seconds"]) <= 0:
+        raise ValueError("remediation.execution_timeout_seconds must be positive")
+    if int(remediation["approval_ttl_minutes"]) <= 0:
+        raise ValueError("remediation.approval_ttl_minutes must be positive")
+    if not isinstance(remediation["command_allowlist"], list) or not remediation["command_allowlist"]:
+        raise ValueError("remediation.command_allowlist must be a non-empty list")
+    escalation = remediation["escalation_minutes"]
+    for key in ("t1", "t5", "t10", "t15"):
+        if key not in escalation:
+            raise ValueError(f"remediation.escalation_minutes missing key: {key}")
+
+    k8sgpt_config = config["k8sgpt"]
+    missing_k8sgpt = sorted(REQUIRED_K8SGPT_KEYS - set(k8sgpt_config))
+    if missing_k8sgpt:
+        raise ValueError(f"missing k8sgpt config keys: {', '.join(missing_k8sgpt)}")
+
+    if not isinstance(k8sgpt_config["namespace_allowlist"], list) or not k8sgpt_config["namespace_allowlist"]:
+        raise ValueError("k8sgpt.namespace_allowlist must be a non-empty list")
+    if not set(k8sgpt_config["namespace_allowlist"]).issubset(set(config["namespace_allowlist"])):
+        raise ValueError("k8sgpt.namespace_allowlist must stay within namespace_allowlist")
+    if not isinstance(k8sgpt_config["filters"], list) or not k8sgpt_config["filters"]:
+        raise ValueError("k8sgpt.filters must be a non-empty list")
+    if int(k8sgpt_config["timeout_seconds"]) <= 0:
+        raise ValueError("k8sgpt.timeout_seconds must be positive")
+    if int(k8sgpt_config["max_output_kb"]) <= 0:
+        raise ValueError("k8sgpt.max_output_kb must be positive")
+    if not str(k8sgpt_config["explicit_kubeconfig"]).strip():
+        raise ValueError("k8sgpt.explicit_kubeconfig is required")

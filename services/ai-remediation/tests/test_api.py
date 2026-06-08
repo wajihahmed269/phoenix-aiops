@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from app.api.server import application
 
@@ -38,13 +39,42 @@ class ApiTests(unittest.TestCase):
                     "restart_thresholds": {"repeated_restart_count": 3, "crashloop_restart_count": 2},
                     "cooldowns": {"default_minutes": 15, "known_limitation_minutes": 360},
                     "local_storage_path": str(Path(self.tempdir.name) / "recommendations.jsonl"),
+                    "approval_storage_path": str(Path(self.tempdir.name) / "approvals.jsonl"),
+                    "execution_audit_path": str(Path(self.tempdir.name) / "execution-audit.jsonl"),
+                    "incident_artifacts_path": str(Path(self.tempdir.name) / "incident-artifacts"),
                     "feature_flags": {
                         "enable_prometheus_collector": False,
                         "enable_loki_collector": False,
                         "enable_kubernetes_collector": False,
                         "enable_argo_collector": False,
+                        "enable_k8sgpt_collector": False,
+                        "enable_remediation_planner": True,
+                        "enable_approval_workflow": True,
+                        "enable_snapshot_capture": True,
+                        "enable_verification": True,
                         "enable_ollama_summary": False,
                         "enable_execution": False
+                    },
+                    "remediation": {
+                        "simulation_only": True,
+                        "execution_timeout_seconds": 30,
+                        "approval_ttl_minutes": 30,
+                        "namespace_allowlist": ["bankapp"],
+                        "resource_kind_allowlist": ["Deployment", "Node"],
+                        "protected_namespaces": ["argocd", "observability"],
+                        "max_blast_radius": "medium",
+                        "rollback_retention_days": 7,
+                        "maintenance_windows_enabled": False,
+                        "escalation_minutes": {"t1": 1, "t5": 5, "t10": 10, "t15": 15},
+                        "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status", "cordon", "uncordon"]
+                    },
+                    "k8sgpt": {
+                        "binary": "k8sgpt",
+                        "timeout_seconds": 20,
+                        "max_output_kb": 256,
+                        "namespace_allowlist": ["bankapp", "observability", "argocd"],
+                        "filters": ["Pod", "Deployment"],
+                        "explicit_kubeconfig": "/home/wajih/.kube/phoenix-k3s-oci.yaml"
                     }
                 }
             ),
@@ -105,6 +135,55 @@ class ApiTests(unittest.TestCase):
         status, acknowledged = _call("POST", f"/v1/recommendations/{recommendation_id}/acknowledge")
         self.assertEqual(status, "200 OK")
         self.assertEqual(acknowledged["status"], "acknowledged")
+
+    def test_plan_approval_and_simulation_execution(self) -> None:
+        status, payload = _call(
+            "POST",
+            "/v1/analyze",
+            {
+                "event_id": "evt-010",
+                "source": "kubernetes",
+                "scenario": "deployment_unhealthy",
+                "cluster": "phoenix-oci-k3s",
+                "namespace": "bankapp",
+                "resource": {"kind": "Deployment", "name": "banking-backend"},
+                "observed_at": "2026-06-08T12:00:00Z",
+                "severity_hint": "medium",
+                "summary": "Deployment unhealthy: bankapp/banking-backend",
+                "evidence": [{"type": "state", "name": "deployment_status", "value": {"desired": 2, "available": 1}, "labels": {}}],
+            },
+        )
+        self.assertEqual(status, "200 OK")
+        recommendation_id = payload["recommendation_id"]
+
+        from app.models.recommendation import Recommendation
+        from app.store.json_store import JsonRecommendationStore
+
+        store = JsonRecommendationStore(str(Path(self.tempdir.name) / "recommendations.jsonl"))
+        store.save_recommendation(Recommendation.from_dict(payload))
+
+        status, plan = _call("GET", f"/v1/recommendations/{recommendation_id}/plan")
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(plan["remediation_id"], "restart_deployment")
+
+        status, requested = _call("POST", f"/v1/recommendations/{recommendation_id}/approval-request", {"requested_by": "wajih", "reason": "safe restart review"})
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(requested["status"], "requested")
+        self.assertEqual(requested["plan_id"], plan["plan_id"])
+
+        status, approved = _call("POST", f"/v1/recommendations/{recommendation_id}/approve", {"approver": "wajih", "reason": "approved for simulation"})
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(approved["status"], "approved")
+        self.assertEqual(approved["plan_id"], plan["plan_id"])
+
+        with patch("app.remediation.guards._cluster_api_reachable", return_value=True), patch("app.remediation.snapshot.subprocess.run") as mocked_run:
+            mocked_run.return_value.stdout = "ok\n"
+            mocked_run.return_value.stderr = ""
+            status, execution = _call("POST", f"/v1/recommendations/{recommendation_id}/execute", {"explicit_execute": False})
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(execution["mode"], "simulation")
+        self.assertTrue(execution["success"])
+        self.assertTrue(Path(self.tempdir.name, "execution-audit.jsonl").exists())
 
 
 def _call(method: str, path: str, payload: dict | None = None) -> tuple[str, dict]:

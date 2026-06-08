@@ -14,6 +14,7 @@ class ActionProposal:
 @dataclass
 class Recommendation:
     recommendation_id: str
+    incident_id: str
     event_id: str
     source: str
     cluster: str
@@ -45,6 +46,7 @@ class Recommendation:
     def from_dict(cls, payload: dict[str, Any]) -> "Recommendation":
         return cls(
             recommendation_id=str(payload["recommendation_id"]),
+            incident_id=str(payload.get("incident_id", "")),
             event_id=str(payload["event_id"]),
             source=str(payload["source"]),
             cluster=str(payload["cluster"]),

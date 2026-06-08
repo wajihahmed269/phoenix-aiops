@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.models.events import IncidentEvent
+from app.models.identity import build_incident_id_for_event
 from app.models.recommendation import ActionProposal, Recommendation
 
 
@@ -55,6 +56,7 @@ def build_recommendation(event: IncidentEvent, policy: dict) -> Recommendation:
 
     return Recommendation(
         recommendation_id=f"rec-{uuid4()}",
+        incident_id=build_incident_id_for_event(event),
         event_id=event.event_id,
         source=event.source,
         cluster=event.cluster,

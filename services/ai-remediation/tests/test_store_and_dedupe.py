@@ -51,6 +51,7 @@ def _sample_recommendation(
 ) -> Recommendation:
     return Recommendation(
         recommendation_id=recommendation_id,
+        incident_id="inc-test-001",
         event_id=event_id,
         source="prometheus",
         cluster="phoenix-oci-k3s",
