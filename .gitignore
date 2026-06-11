@@ -12,6 +12,20 @@ terraform.tfvars
 *.key
 .env
 .env.*
+!services/ai-remediation/.env.example
 
 # Terraform provider lock files
 **/.terraform.lock.hcl
+
+# Python cache files
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Runtime incident artifacts
+incident-artifacts/*
+!incident-artifacts/.gitkeep
+
+# AI remediation runtime state
+services/ai-remediation/data/runtime/
+.env.aiops

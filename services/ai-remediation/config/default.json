@@ -1,0 +1,126 @@
+{
+  "cluster_name": "phoenix-oci-k3s",
+  "namespace_allowlist": [
+    "bankapp",
+    "observability",
+    "argocd"
+  ],
+  "prometheus_url": "http://127.0.0.1:9090",
+  "loki_url": "http://127.0.0.1:3100",
+  "kubernetes_mode": "kubectl",
+  "kubeconfig_path": "/home/wajih/.kube/phoenix-k3s-oci.yaml",
+  "argo_namespace": "argocd",
+  "polling_intervals": {
+    "prometheus_seconds": 60,
+    "loki_seconds": 120,
+    "kubernetes_seconds": 60,
+    "argo_seconds": 90
+  },
+  "request_timeouts": {
+    "http_seconds": 5,
+    "kubectl_seconds": 10
+  },
+  "max_log_lines": 25,
+  "max_log_window_minutes": 15,
+  "max_evidence_items": 5,
+  "memory_thresholds": {
+    "pod_working_set_mib_warn": 400
+  },
+  "restart_thresholds": {
+    "repeated_restart_count": 3,
+    "crashloop_restart_count": 2
+  },
+  "cooldowns": {
+    "default_minutes": 15,
+    "known_limitation_minutes": 360
+  },
+  "local_storage_path": "services/ai-remediation/data/runtime/recommendations.jsonl",
+  "approval_storage_path": "services/ai-remediation/data/runtime/approvals.jsonl",
+  "execution_audit_path": "services/ai-remediation/data/runtime/execution-audit.jsonl",
+  "incident_artifacts_path": "incident-artifacts",
+  "incident_artifacts": {
+    "max_json_bytes": 262144,
+    "max_text_bytes": 65536,
+    "max_timeline_entries": 2000,
+    "timeline_summary_entries": 5
+  },
+  "alerting": {
+    "env_file": ".env.aiops",
+    "provider_timeout_seconds": 5,
+    "provider_max_retries": 2,
+    "max_notification_log_bytes": 65536
+  },
+  "auto_remediation": {
+    "enabled": false,
+    "allowed_actions": [
+      "restart_banking_backend"
+    ],
+    "allowed_namespace": "bankapp",
+    "allowed_deployment": "banking-backend",
+    "timeout_minutes": 10,
+    "require_snapshot": true,
+    "verify_rollout": true
+  },
+  "feature_flags": {
+    "enable_prometheus_collector": true,
+    "enable_loki_collector": true,
+    "enable_kubernetes_collector": true,
+    "enable_argo_collector": true,
+    "enable_k8sgpt_collector": false,
+    "enable_remediation_planner": true,
+    "enable_approval_workflow": true,
+    "enable_snapshot_capture": true,
+    "enable_verification": true,
+    "enable_ollama_summary": false,
+    "enable_execution": false
+  },
+  "remediation": {
+    "simulation_only": true,
+    "execution_timeout_seconds": 30,
+    "approval_ttl_minutes": 30,
+    "namespace_allowlist": [
+      "bankapp"
+    ],
+    "resource_kind_allowlist": [
+      "Deployment"
+    ],
+    "protected_namespaces": [
+      "argocd",
+      "observability"
+    ],
+    "max_blast_radius": "medium",
+    "rollback_retention_days": 7,
+    "maintenance_windows_enabled": false,
+    "escalation_minutes": {
+      "t1": 1,
+      "t5": 5,
+      "t10": 10,
+      "t15": 15
+    },
+    "command_allowlist": [
+      "get",
+      "describe",
+      "logs",
+      "rollout restart",
+      "rollout status"
+    ]
+  },
+  "k8sgpt": {
+    "binary": "k8sgpt",
+    "timeout_seconds": 20,
+    "max_output_kb": 256,
+    "namespace_allowlist": [
+      "bankapp",
+      "observability",
+      "argocd"
+    ],
+    "filters": [
+      "Pod",
+      "Deployment",
+      "Service",
+      "Ingress",
+      "PersistentVolumeClaim"
+    ],
+    "explicit_kubeconfig": "~/.kube/phoenix-k3s-oci.yaml"
+  }
+}

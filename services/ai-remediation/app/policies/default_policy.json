@@ -1,0 +1,59 @@
+{
+  "version": "2026-06-08.safe-v1",
+  "allowed_action_classes": [
+    "collect_evidence",
+    "query_logs",
+    "query_metrics",
+    "summarize_incident",
+    "open_runbook",
+    "propose_rollout_restart",
+    "propose_scale_change",
+    "propose_config_review"
+  ],
+  "forbidden_action_classes": [
+    "delete_namespace",
+    "delete_pod",
+    "drain_node",
+    "cordon_node",
+    "terraform_apply",
+    "terraform_destroy",
+    "database_write",
+    "secret_read_plaintext",
+    "rbac_widen",
+    "networkpolicy_weaken",
+    "public_exposure_change",
+    "auto_sync_enable"
+  ],
+  "approval": {
+    "mutating_actions_require_human_approval": true,
+    "approval_ttl_minutes": 30
+  },
+  "cooldowns": {
+    "same_recommendation_minutes": 15,
+    "same_namespace_medium_or_higher_minutes": 30,
+    "known_limitation_minutes": 360
+  },
+  "rate_limits": {
+    "events_per_10m": 20,
+    "recommendations_per_resource_per_10m": 5,
+    "pending_mutating_recommendations_per_resource": 1
+  },
+  "known_limitations": [
+    {
+      "scenario": "target_down",
+      "match": {
+        "job": "kubernetes-kubelet",
+        "lastError_contains": "403 Forbidden"
+      },
+      "decision": "suppress_mutation"
+    },
+    {
+      "scenario": "target_down",
+      "match": {
+        "job": "kubernetes-cadvisor",
+        "lastError_contains": "403 Forbidden"
+      },
+      "decision": "suppress_mutation"
+    }
+  ]
+}

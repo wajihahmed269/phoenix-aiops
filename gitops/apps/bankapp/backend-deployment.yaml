@@ -33,6 +33,10 @@ spec:
                 sleep 3
               done
               echo "mysql is reachable"
+          imagePullPolicy: IfNotPresent
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
       containers:
         - name: backend
           image: ghcr.io/wajihahmed269/ai-banking-backend:9b3cdb1
@@ -51,12 +55,18 @@ spec:
               port: http
             initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /
               port: http
             initialDelaySeconds: 60
             periodSeconds: 15
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
           resources:
             requests:
               cpu: 250m
