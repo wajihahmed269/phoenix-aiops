@@ -24,14 +24,23 @@ with tempfile.TemporaryDirectory() as tmpdir:
         "execution_audit_path": str(Path(tmpdir) / "execution-audit.jsonl"),
         "namespace_allowlist": ["bankapp", "observability", "argocd"],
         "feature_flags": {"enable_execution": False},
+        "auto_remediation": {
+            "enabled": True,
+            "allowed_actions": ["restart_banking_backend"],
+            "allowed_namespace": "bankapp",
+            "allowed_deployment": "banking-backend",
+            "timeout_minutes": 10,
+            "require_snapshot": True,
+            "verify_rollout": True,
+        },
         "remediation": {
             "namespace_allowlist": ["bankapp"],
-            "resource_kind_allowlist": ["Deployment", "Node"],
+            "resource_kind_allowlist": ["Deployment"],
             "protected_namespaces": ["argocd", "observability"],
             "max_blast_radius": "medium",
             "simulation_only": True,
             "execution_timeout_seconds": 30,
-            "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status", "cordon", "uncordon"],
+            "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status"],
         },
     }
     recommendation = Recommendation(
@@ -78,7 +87,18 @@ with tempfile.TemporaryDirectory() as tmpdir:
         scope="execute",
         expires_at="2099-06-09T00:30:00Z",
     )
-    audit_store.append({"plan_id": plan.plan_id, "status": "simulated", "started_at": "2026-06-09T00:00:00Z", "finished_at": "2026-06-09T00:01:00Z"})
+    audit_store.append(
+        {
+            "plan_id": plan.plan_id,
+            "action": plan.remediation_id,
+            "namespace": recommendation.namespace,
+            "resource_kind": recommendation.resource["kind"],
+            "resource": recommendation.resource["name"],
+            "status": "simulated",
+            "started_at": "2026-06-09T00:00:00Z",
+            "finished_at": "2026-06-09T00:01:00Z",
+        }
+    )
     with patch("app.remediation.guards._cluster_api_reachable", return_value=True):
         decision = evaluate_guardrails(plan, recommendation, config, approval=approval, audit_store=audit_store, explicit_execute=False)
     assert not decision.allow and "duplicate execution prevented for this plan" in decision.reasons

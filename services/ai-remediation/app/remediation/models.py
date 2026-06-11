@@ -10,6 +10,7 @@ class CatalogEntry:
     description: str
     allowed_namespaces: list[str]
     allowed_resource_kinds: list[str]
+    allowed_resource_names: list[str]
     risk_class: str
     blast_radius: str
     rollback_capability: str

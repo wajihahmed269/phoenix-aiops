@@ -36,3 +36,15 @@ class ExecutionAuditStore:
         if not matching:
             return None
         return max(matching, key=lambda item: item.get("finished_at") or item.get("started_at") or "")
+
+    def latest_for_target(self, action: str, namespace: str, resource_kind: str, resource_name: str) -> dict[str, Any] | None:
+        matching = [
+            item
+            for item in self.list_records()
+            if item.get("action") == action
+            and item.get("namespace") == namespace
+            and item.get("resource") == {"kind": resource_kind, "name": resource_name}
+        ]
+        if not matching:
+            return None
+        return max(matching, key=lambda item: item.get("finished_at") or item.get("started_at") or "")

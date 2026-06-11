@@ -5,8 +5,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import subprocess
 import json
+import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -18,23 +19,25 @@ from app.remediation.verify import verify_remediation
 class VerificationEngineTests(unittest.TestCase):
     def test_simulated_verification_skips_live_checks(self) -> None:
         recommendation = _recommendation()
-        plan = generate_plan(recommendation, _config())
-        result = verify_remediation(plan, recommendation, _config(), simulated=True)
+        plan = generate_plan(recommendation, _config(tempfile.mkdtemp()))
+        result = verify_remediation(plan, recommendation, _config(tempfile.mkdtemp()), simulated=True)
         self.assertTrue(result.success)
         self.assertEqual(result.mode, "simulation")
 
     def test_live_verification_handles_rollout_status(self) -> None:
-        recommendation = _recommendation()
-        plan = generate_plan(recommendation, _config())
-        responses = [
-            subprocess.CompletedProcess(args=["kubectl"], returncode=0, stdout="ok", stderr=""),
-            subprocess.CompletedProcess(args=["kubectl"], returncode=0, stdout=json.dumps({"spec": {"replicas": 1}, "status": {"readyReplicas": 1}}), stderr=""),
-            subprocess.CompletedProcess(args=["kubectl"], returncode=0, stdout=json.dumps({"items": []}), stderr=""),
-        ]
-        with patch("app.remediation.verify.subprocess.run", side_effect=responses):
-            result = verify_remediation(plan, recommendation, _config(), simulated=False)
-        self.assertTrue(result.success)
-        self.assertEqual(result.mode, "live")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            recommendation = _recommendation()
+            config = _config(tmpdir, simulation_only=False)
+            plan = generate_plan(recommendation, config)
+            responses = [
+                subprocess.CompletedProcess(args=["kubectl"], returncode=0, stdout="ok", stderr=""),
+                subprocess.CompletedProcess(args=["kubectl"], returncode=0, stdout=json.dumps({"spec": {"replicas": 1}, "status": {"readyReplicas": 1}}), stderr=""),
+                subprocess.CompletedProcess(args=["kubectl"], returncode=0, stdout=json.dumps({"items": []}), stderr=""),
+            ]
+            with patch("app.remediation.verify.subprocess.run", side_effect=responses):
+                result = verify_remediation(plan, recommendation, config, simulated=False)
+            self.assertTrue(result.success)
+            self.assertEqual(result.mode, "live")
 
 
 def _recommendation() -> Recommendation:
@@ -62,16 +65,33 @@ def _recommendation() -> Recommendation:
     )
 
 
-def _config() -> dict:
+def _config(tmpdir: str, *, simulation_only: bool = True) -> dict:
+    env_file = Path(tmpdir) / ".env.aiops"
+    env_file.write_text(
+        "\n".join(
+            [
+                "BREVO_API_KEY=test-secret",
+                "ALERT_FROM_EMAIL=phoenix@example.com",
+                "ALERT_TO_EMAIL=ops@example.com",
+                "ALERT_PROVIDER=brevo",
+                "ALERT_DRY_RUN=true",
+                "AUTO_RESTART_BANKING_BACKEND=false",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return {
         "namespace_allowlist": ["bankapp", "observability", "argocd"],
         "kubeconfig_path": "/home/wajih/.kube/phoenix-k3s-oci.yaml",
+        "alerting": {"env_file": str(env_file), "provider_timeout_seconds": 5, "provider_max_retries": 2, "max_notification_log_bytes": 65536},
+        "auto_remediation": {"enabled": False, "allowed_actions": ["restart_banking_backend"], "allowed_namespace": "bankapp", "allowed_deployment": "banking-backend", "timeout_minutes": 10, "require_snapshot": True, "verify_rollout": True},
         "remediation": {
             "execution_timeout_seconds": 30,
             "namespace_allowlist": ["bankapp"],
-            "resource_kind_allowlist": ["Deployment", "Node"],
+            "resource_kind_allowlist": ["Deployment"],
             "max_blast_radius": "medium",
-            "simulation_only": True,
+            "simulation_only": simulation_only,
         },
     }
 

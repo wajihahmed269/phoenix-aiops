@@ -81,6 +81,21 @@ def _approval(recommendation: Recommendation, plan_id: str, remediation_id: str)
 
 
 def _config(tmpdir: str) -> dict:
+    env_file = Path(tmpdir) / ".env.aiops"
+    env_file.write_text(
+        "\n".join(
+            [
+                "BREVO_API_KEY=test-secret",
+                "ALERT_FROM_EMAIL=phoenix@example.com",
+                "ALERT_TO_EMAIL=ops@example.com",
+                "ALERT_PROVIDER=brevo",
+                "ALERT_DRY_RUN=true",
+                "AUTO_RESTART_BANKING_BACKEND=false",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return {
         "kubeconfig_path": "/home/wajih/.kube/phoenix-k3s-oci.yaml",
         "request_timeouts": {"kubectl_seconds": 5},
@@ -88,14 +103,16 @@ def _config(tmpdir: str) -> dict:
         "incident_artifacts_path": str(Path(tmpdir) / "incident-artifacts"),
         "namespace_allowlist": ["bankapp", "observability", "argocd"],
         "feature_flags": {"enable_execution": False},
+        "alerting": {"env_file": str(env_file), "provider_timeout_seconds": 5, "provider_max_retries": 2, "max_notification_log_bytes": 65536},
+        "auto_remediation": {"enabled": False, "allowed_actions": ["restart_banking_backend"], "allowed_namespace": "bankapp", "allowed_deployment": "banking-backend", "timeout_minutes": 10, "require_snapshot": True, "verify_rollout": True},
         "remediation": {
             "simulation_only": True,
             "namespace_allowlist": ["bankapp"],
-            "resource_kind_allowlist": ["Deployment", "Node"],
+            "resource_kind_allowlist": ["Deployment"],
             "protected_namespaces": ["argocd", "observability"],
             "max_blast_radius": "medium",
             "execution_timeout_seconds": 30,
-            "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status", "cordon", "uncordon"],
+            "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status"],
         },
     }
 

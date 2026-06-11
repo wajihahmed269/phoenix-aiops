@@ -12,6 +12,7 @@ terraform.tfvars
 *.key
 .env
 .env.*
+!services/ai-remediation/.env.example
 
 # Terraform provider lock files
 **/.terraform.lock.hcl
@@ -27,3 +28,4 @@ incident-artifacts/*
 
 # AI remediation runtime state
 services/ai-remediation/data/runtime/
+.env.aiops

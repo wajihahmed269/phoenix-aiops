@@ -116,6 +116,10 @@ def _run_namespace_analysis(config: dict, namespace: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         return _unavailable_payload(namespace, "invalid_json", command=command)
 
+    results = _extract_results(payload)
+    if not results and payload not in ({}, []):
+        return _unavailable_payload(namespace, "unexpected_schema", command=command)
+
     findings, suppressed = _normalize_findings(namespace, payload)
     return {
         "namespace": namespace,
@@ -124,7 +128,7 @@ def _run_namespace_analysis(config: dict, namespace: str) -> dict[str, Any]:
         "suppressed_findings": suppressed,
         "error": None,
         "command": command,
-        "raw_result_count": len(_extract_results(payload)),
+        "raw_result_count": len(results),
     }
 
 

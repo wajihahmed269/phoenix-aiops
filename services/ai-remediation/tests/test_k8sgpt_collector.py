@@ -33,6 +33,27 @@ BASE_CONFIG = {
     "approval_storage_path": "services/ai-remediation/data/runtime/test-approvals.jsonl",
     "execution_audit_path": "services/ai-remediation/data/runtime/test-audit.jsonl",
     "incident_artifacts_path": "incident-artifacts",
+    "incident_artifacts": {
+        "max_json_bytes": 262144,
+        "max_text_bytes": 65536,
+        "max_timeline_entries": 2000,
+        "timeline_summary_entries": 5,
+    },
+    "alerting": {
+        "env_file": "/tmp/.env.aiops",
+        "provider_timeout_seconds": 5,
+        "provider_max_retries": 2,
+        "max_notification_log_bytes": 65536,
+    },
+    "auto_remediation": {
+        "enabled": False,
+        "allowed_actions": ["restart_banking_backend"],
+        "allowed_namespace": "bankapp",
+        "allowed_deployment": "banking-backend",
+        "timeout_minutes": 10,
+        "require_snapshot": True,
+        "verify_rollout": True,
+    },
     "feature_flags": {
         "enable_prometheus_collector": False,
         "enable_loki_collector": False,
@@ -51,13 +72,13 @@ BASE_CONFIG = {
         "execution_timeout_seconds": 30,
         "approval_ttl_minutes": 30,
         "namespace_allowlist": ["bankapp"],
-        "resource_kind_allowlist": ["Deployment", "Node"],
+        "resource_kind_allowlist": ["Deployment"],
         "protected_namespaces": ["argocd", "observability"],
         "max_blast_radius": "medium",
         "rollback_retention_days": 7,
         "maintenance_windows_enabled": False,
         "escalation_minutes": {"t1": 1, "t5": 5, "t10": 10, "t15": 15},
-        "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status", "cordon", "uncordon"],
+        "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status"],
     },
     "k8sgpt": {
         "binary": "k8sgpt",
@@ -128,6 +149,12 @@ class K8sGPTCollectorTests(unittest.TestCase):
         config["feature_flags"]["enable_k8sgpt_collector"] = False
         result = collect_namespace_advisories(config, ["bankapp"])
         self.assertEqual(result["bankapp"]["status"], "disabled")
+
+    def test_unexpected_schema_gracefully_degrades(self) -> None:
+        completed = subprocess.CompletedProcess(args=["k8sgpt"], returncode=0, stdout='{"unexpected":"shape"}', stderr="")
+        with patch("app.collectors.k8sgpt.subprocess.run", return_value=completed):
+            result = collect_namespace_advisories(_config(), ["bankapp"])
+        self.assertEqual(result["bankapp"]["error"], "unexpected_schema")
 
 
 def _config() -> dict:

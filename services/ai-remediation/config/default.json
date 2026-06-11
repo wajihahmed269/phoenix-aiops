@@ -38,6 +38,29 @@
   "approval_storage_path": "services/ai-remediation/data/runtime/approvals.jsonl",
   "execution_audit_path": "services/ai-remediation/data/runtime/execution-audit.jsonl",
   "incident_artifacts_path": "incident-artifacts",
+  "incident_artifacts": {
+    "max_json_bytes": 262144,
+    "max_text_bytes": 65536,
+    "max_timeline_entries": 2000,
+    "timeline_summary_entries": 5
+  },
+  "alerting": {
+    "env_file": ".env.aiops",
+    "provider_timeout_seconds": 5,
+    "provider_max_retries": 2,
+    "max_notification_log_bytes": 65536
+  },
+  "auto_remediation": {
+    "enabled": false,
+    "allowed_actions": [
+      "restart_banking_backend"
+    ],
+    "allowed_namespace": "bankapp",
+    "allowed_deployment": "banking-backend",
+    "timeout_minutes": 10,
+    "require_snapshot": true,
+    "verify_rollout": true
+  },
   "feature_flags": {
     "enable_prometheus_collector": true,
     "enable_loki_collector": true,
@@ -59,8 +82,7 @@
       "bankapp"
     ],
     "resource_kind_allowlist": [
-      "Deployment",
-      "Node"
+      "Deployment"
     ],
     "protected_namespaces": [
       "argocd",
@@ -80,9 +102,7 @@
       "describe",
       "logs",
       "rollout restart",
-      "rollout status",
-      "cordon",
-      "uncordon"
+      "rollout status"
     ]
   },
   "k8sgpt": {

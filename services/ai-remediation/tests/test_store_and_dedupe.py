@@ -5,12 +5,12 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from pathlib import Path
 import tempfile
 import unittest
 
 from app.models.recommendation import ActionProposal, Recommendation
 from app.pipeline.dedupe import evaluate_recommendation
+from app.store.incident_artifacts import IncidentArtifactStore
 from app.store.json_store import JsonRecommendationStore
 
 
@@ -42,6 +42,28 @@ class StoreAndDedupeTests(unittest.TestCase):
             )
             self.assertFalse(decision.allow)
             self.assertTrue(decision.cooldown_applied)
+
+    def test_incident_artifact_layout_and_timeline_format(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = IncidentArtifactStore(
+                tmpdir,
+                {
+                    "max_json_bytes": 4096,
+                    "max_text_bytes": 4096,
+                    "max_timeline_entries": 10,
+                    "timeline_summary_entries": 5,
+                    "max_notification_log_bytes": 4096,
+                },
+            )
+            store.persist_summary("inc:test/001", "# Summary\n")
+            store.persist_recommendation("inc:test/001", _sample_recommendation())
+            store.append_timeline("inc:test/001", timestamp="2026-06-10T03:12:10Z", stage="detection", message="incident detected")
+
+            incident_dir = Path(tmpdir) / "inc-test-001"
+            self.assertTrue((incident_dir / "summary.md").exists())
+            self.assertTrue((incident_dir / "recommendation.json").exists())
+            self.assertTrue((incident_dir / "timeline.md").exists())
+            self.assertIn("[2026-06-10T03:12:10Z]\nincident detected", (incident_dir / "timeline.md").read_text(encoding="utf-8"))
 
 
 def _sample_recommendation(

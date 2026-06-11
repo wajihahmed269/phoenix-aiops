@@ -74,23 +74,40 @@ def _recommendation() -> Recommendation:
 
 
 def _config(tmpdir: str) -> dict:
+    env_file = Path(tmpdir) / ".env.aiops"
+    env_file.write_text(
+        "\n".join(
+            [
+                "BREVO_API_KEY=test-secret",
+                "ALERT_FROM_EMAIL=phoenix@example.com",
+                "ALERT_TO_EMAIL=ops@example.com",
+                "ALERT_PROVIDER=brevo",
+                "ALERT_DRY_RUN=true",
+                "AUTO_RESTART_BANKING_BACKEND=false",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return {
         "local_storage_path": str(Path(tmpdir) / "recommendations.jsonl"),
         "approval_storage_path": str(Path(tmpdir) / "approvals.jsonl"),
         "incident_artifacts_path": str(Path(tmpdir) / "incident-artifacts"),
         "kubeconfig_path": "/home/wajih/.kube/phoenix-k3s-oci.yaml",
+        "alerting": {"env_file": str(env_file), "provider_timeout_seconds": 5, "provider_max_retries": 2, "max_notification_log_bytes": 65536},
+        "auto_remediation": {"enabled": False, "allowed_actions": ["restart_banking_backend"], "allowed_namespace": "bankapp", "allowed_deployment": "banking-backend", "timeout_minutes": 10, "require_snapshot": True, "verify_rollout": True},
         "remediation": {
             "approval_ttl_minutes": 30,
             "simulation_only": True,
             "execution_timeout_seconds": 30,
             "namespace_allowlist": ["bankapp"],
-            "resource_kind_allowlist": ["Deployment", "Node"],
+            "resource_kind_allowlist": ["Deployment"],
             "protected_namespaces": ["argocd", "observability"],
             "max_blast_radius": "medium",
             "rollback_retention_days": 7,
             "maintenance_windows_enabled": False,
             "escalation_minutes": {"t1": 1, "t5": 5, "t10": 10, "t15": 15},
-            "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status", "cordon", "uncordon"],
+            "command_allowlist": ["get", "describe", "logs", "rollout restart", "rollout status"],
         },
     }
 

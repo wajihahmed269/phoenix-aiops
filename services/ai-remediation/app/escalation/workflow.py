@@ -24,6 +24,9 @@ def build_escalation_state(recommendation: Recommendation, config: dict, *, now:
         "incident_id": recommendation.incident_id,
         "age_minutes": age_minutes,
         "stage": stage,
+        "execution_state": "disabled",
+        "approval_required": recommendation.requires_human_approval,
+        "approval_state": "human_approval_required" if recommendation.requires_human_approval else "not_required",
         "fallback_candidate_allowed": age_minutes >= timings["t10"],
         "bounded_execution_window_open": age_minutes >= timings["t15"],
     }

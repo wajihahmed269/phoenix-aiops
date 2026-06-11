@@ -21,6 +21,7 @@ def execute_plan(
     *,
     approval: ApprovalRecord | None,
     explicit_execute: bool,
+    auto_execute: bool = False,
 ) -> ExecutionResult:
     audit_store = ExecutionAuditStore(config["execution_audit_path"])
     started_at = utc_now()
@@ -31,9 +32,11 @@ def execute_plan(
         approval=approval,
         audit_store=audit_store,
         explicit_execute=explicit_execute,
+        auto_execute=auto_execute,
     )
+    artifacts = IncidentArtifactStore(config["incident_artifacts_path"], config.get("incident_artifacts"))
     snapshot = capture_snapshot(plan, recommendation, config)
-    artifacts = IncidentArtifactStore(config["incident_artifacts_path"])
+    artifacts.append_timeline(plan.incident_id, timestamp=started_at, stage="snapshot", message="snapshot captured before remediation")
 
     simulated = True
     commands = list(plan.command_preview)
@@ -55,8 +58,11 @@ def execute_plan(
         "recommendation_id": plan.recommendation_id,
         "plan_id": plan.plan_id,
         "action": plan.remediation_id,
+        "namespace": plan.namespace,
+        "resource": {"kind": plan.resource_kind, "name": plan.resource_name},
         "status": "simulated" if simulated else ("succeeded" if success else "failed"),
         "mode": "simulation" if simulated else "live",
+        "auto_execute": auto_execute,
         "approved_by": approval.approver if approval else None,
         "command_preview": commands,
         "started_at": started_at,
@@ -101,6 +107,6 @@ def _validate_command(command: list[str]) -> None:
     if not command or command[0] != "kubectl":
         raise ValueError("only kubectl commands are allowed")
     joined = " ".join(command)
-    allowed = (" rollout restart ", " rollout status ", " get ", " describe ", " logs ", " cordon ", " uncordon ")
+    allowed = (" rollout restart ", " rollout status ", " get ", " describe ", " logs ")
     if not any(token in f" {joined} " for token in allowed):
         raise ValueError("kubectl command is not in the explicit allowlist")

@@ -4,6 +4,7 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 
 from app.approval.models import ApprovalRecord
+from app.config.runtime import load_auto_remediation_settings
 from app.models.recommendation import Recommendation
 from app.remediation.models import GuardDecision, RemediationPlan
 from app.store.execution_audit import ExecutionAuditStore
@@ -17,6 +18,7 @@ def evaluate_guardrails(
     approval: ApprovalRecord | None,
     audit_store: ExecutionAuditStore,
     explicit_execute: bool,
+    auto_execute: bool = False,
 ) -> GuardDecision:
     reasons: list[str] = []
     checks: list[str] = []
@@ -34,25 +36,19 @@ def evaluate_guardrails(
         reasons.append("protected namespace cannot be mutated in this phase")
     checks.append("protected_namespace_checked")
 
-    if approval is None:
-        reasons.append("valid approval is required before execution")
+    if auto_execute:
+        approval_scope_valid = _evaluate_auto_execute_policy(plan, recommendation, config, reasons)
     else:
-        if approval.plan_id != plan.plan_id or approval.remediation_id != plan.remediation_id or approval.resource != {"kind": plan.resource_kind, "name": plan.resource_name}:
-            reasons.append("approval scope does not match remediation plan")
-        else:
-            approval_scope_valid = True
-        expires_at = _parse_time(approval.expires_at)
-        if _parse_time(datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")) > expires_at:
-            reasons.append("approval expired")
-    checks.append("approval_checked")
+        approval_scope_valid = _evaluate_manual_approval(plan, approval, reasons)
+    checks.append("approval_or_auto_policy_checked")
 
     if not _cluster_api_reachable(config):
         reasons.append("cluster API unreachable")
     checks.append("cluster_reachability_checked")
 
-    latest = audit_store.latest_for_plan(plan.plan_id)
-    if latest and latest.get("status") in {"simulated", "succeeded"}:
-        reasons.append("duplicate execution prevented for this plan")
+    latest_target = audit_store.latest_for_target(plan.remediation_id, plan.namespace, plan.resource_kind, plan.resource_name)
+    if latest_target and latest_target.get("status") in {"simulated", "succeeded"}:
+        reasons.append("duplicate execution prevented for this remediation target")
     checks.append("duplicate_execution_checked")
 
     if _blast_rank(plan.blast_radius) > _blast_rank(config["remediation"]["max_blast_radius"]):
@@ -86,6 +82,46 @@ def evaluate_guardrails(
     return GuardDecision(allow=not reasons, reasons=reasons, checks=checks, approval_scope_valid=approval_scope_valid)
 
 
+def _evaluate_manual_approval(plan: RemediationPlan, approval: ApprovalRecord | None, reasons: list[str]) -> bool:
+    if approval is None:
+        reasons.append("valid approval is required before execution")
+        return False
+    approval_scope_valid = False
+    if approval.plan_id != plan.plan_id or approval.remediation_id != plan.remediation_id or approval.resource != {"kind": plan.resource_kind, "name": plan.resource_name}:
+        reasons.append("approval scope does not match remediation plan")
+    else:
+        approval_scope_valid = True
+    expires_at = _parse_time(approval.expires_at)
+    if _parse_time(datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")) > expires_at:
+        reasons.append("approval expired")
+    return approval_scope_valid
+
+
+def _evaluate_auto_execute_policy(plan: RemediationPlan, recommendation: Recommendation, config: dict, reasons: list[str]) -> bool:
+    settings = load_auto_remediation_settings(config)
+    if not settings.config_enabled:
+        reasons.append("auto-remediation policy disabled")
+    if not settings.env_enabled:
+        reasons.append("AUTO_RESTART_BANKING_BACKEND is not enabled")
+    if plan.remediation_id != "restart_banking_backend":
+        reasons.append("plan is not the allowed banking-backend restart action")
+    if recommendation.namespace != settings.allowed_namespace:
+        reasons.append("auto-remediation namespace is not allowed")
+    if recommendation.resource.get("kind") != "Deployment":
+        reasons.append("auto-remediation is only allowed for Deployment resources")
+    if recommendation.resource.get("name") != settings.allowed_deployment:
+        reasons.append("auto-remediation is only allowed for deployment/banking-backend")
+    if "restart_banking_backend" not in settings.allowed_actions:
+        reasons.append("restart_banking_backend is not present in allowed_actions")
+    if not settings.require_snapshot:
+        reasons.append("snapshot required")
+    if not settings.verify_rollout:
+        reasons.append("rollout verification required")
+    if "rollout_status" not in plan.verification_checks or "deployment_readiness" not in plan.verification_checks:
+        reasons.append("verification checks are incomplete for auto-remediation")
+    return not reasons
+
+
 def _cluster_api_reachable(config: dict) -> bool:
     command = ["kubectl", "--kubeconfig", config["kubeconfig_path"], "cluster-info"]
     try:
@@ -99,7 +135,7 @@ def _cooldown_active(plan: RemediationPlan, audit_store: ExecutionAuditStore) ->
     cooldown_minutes = max(0, int(plan.labels.get("cooldown_minutes", "0") or 0))
     if cooldown_minutes == 0:
         return False
-    latest = audit_store.latest_for_plan(plan.plan_id)
+    latest = audit_store.latest_for_target(plan.remediation_id, plan.namespace, plan.resource_kind, plan.resource_name)
     if latest is None:
         return False
     finished_at = latest.get("finished_at") or latest.get("started_at")

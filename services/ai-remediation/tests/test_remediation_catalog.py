@@ -11,13 +11,15 @@ from app.remediation.catalog import load_catalog
 
 
 class RemediationCatalogTests(unittest.TestCase):
-    def test_restart_deployment_entry_is_bounded(self) -> None:
+    def test_restart_banking_backend_entry_is_bounded(self) -> None:
         catalog = load_catalog()
-        entry = catalog["restart_deployment"]
+        entry = catalog["restart_banking_backend"]
         self.assertEqual(entry.risk_class, "low")
         self.assertEqual(entry.blast_radius, "low")
         self.assertTrue(entry.executable)
-        self.assertIn("Deployment", entry.allowed_resource_kinds)
+        self.assertEqual(entry.allowed_namespaces, ["bankapp"])
+        self.assertEqual(entry.allowed_resource_kinds, ["Deployment"])
+        self.assertEqual(entry.allowed_resource_names, ["banking-backend"])
 
     def test_non_executable_placeholders_remain_cataloged(self) -> None:
         catalog = load_catalog()

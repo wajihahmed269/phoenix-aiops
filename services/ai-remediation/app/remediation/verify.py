@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import subprocess
 import json
+import subprocess
 
 from app.models.recommendation import Recommendation
 from app.remediation.models import RemediationPlan, VerificationResult
@@ -18,7 +18,7 @@ def verify_remediation(plan: RemediationPlan, recommendation: Recommendation, co
 
     checks: list[dict] = []
     success = True
-    if plan.remediation_id == "restart_deployment":
+    if plan.remediation_id == "restart_banking_backend":
         success &= _run_rollout_status_check(plan, recommendation, config, checks)
         success &= _run_deployment_readiness_check(recommendation, config, checks)
         success &= _run_restart_stability_check(recommendation, config, checks)
@@ -89,11 +89,7 @@ def _run_restart_stability_check(recommendation: Recommendation, config: dict, c
         payload = json.loads(completed.stdout or "{}")
         name = recommendation.resource.get("name", "")
         matching = [item for item in payload.get("items", []) if name in item.get("metadata", {}).get("name", "")]
-        restart_count = sum(
-            status.get("restartCount", 0)
-            for item in matching
-            for status in item.get("status", {}).get("containerStatuses", [])
-        )
+        restart_count = sum(status.get("restartCount", 0) for item in matching for status in item.get("status", {}).get("containerStatuses", []))
         if restart_count <= 1:
             checks.append({"name": "restart_stability", "status": "passed", "restart_count": restart_count})
             return True

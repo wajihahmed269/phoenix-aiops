@@ -36,7 +36,7 @@ def _append_status_timeline(
     reason: str | None = None,
 ) -> None:
     active_config = config or load_config()
-    artifacts = IncidentArtifactStore(active_config["incident_artifacts_path"])
+    artifacts = IncidentArtifactStore(active_config["incident_artifacts_path"], active_config.get("incident_artifacts"))
     suffix = f" ({reason})" if reason else ""
     try:
         artifacts.append_timeline(

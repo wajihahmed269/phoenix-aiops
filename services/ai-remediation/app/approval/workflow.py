@@ -150,4 +150,9 @@ def _parse_time(value: str) -> datetime:
 
 
 def _append_timeline(config: dict, incident_id: str, timestamp: str, stage: str, message: str) -> None:
-    IncidentArtifactStore(config["incident_artifacts_path"]).append_timeline(incident_id, timestamp=timestamp, stage=stage, message=message)
+    IncidentArtifactStore(config["incident_artifacts_path"], config.get("incident_artifacts")).append_timeline(
+        incident_id,
+        timestamp=timestamp,
+        stage=stage,
+        message=message,
+    )

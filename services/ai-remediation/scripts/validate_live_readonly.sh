@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-$HOME/.kube/phoenix-k3s-oci.yaml}"
+export ALERT_DRY_RUN="${ALERT_DRY_RUN:-true}"
 
 echo "Phoenix-Ops AI remediation live read-only validation"
 echo "Using kubeconfig: ${KUBECONFIG_PATH}"
+echo "Notification mode override: ALERT_DRY_RUN=${ALERT_DRY_RUN}"
 
 if ! command -v kubectl >/dev/null 2>&1; then
   echo "kubectl is required."

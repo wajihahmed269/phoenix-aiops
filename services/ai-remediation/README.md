@@ -53,6 +53,8 @@ python3 services/ai-remediation/app/main.py
 python3 services/ai-remediation/app/cli.py poll-once
 ```
 
+Copy `services/ai-remediation/.env.example` to `.env.aiops` and fill in the alerting values before running the service.
+
 Default bind:
 
 - host: `127.0.0.1`
@@ -96,3 +98,4 @@ Default bind:
 - Persistence is local JSONL for now; no database is introduced in this phase.
 - Collectors are read-only by design.
 - LLM integration is optional and intentionally absent from the execution path.
+- `AUTO_RESTART_BANKING_BACKEND` stays disabled by default and only gates the bounded `banking-backend` policy.
